@@ -4,10 +4,10 @@ A desktop application built with Java and JavaFX for creating, managing, and vis
 
 ## Features
 * **Interactive Canvas:** Dynamically add, remove, drag, and connect nodes on the canvas. Supports zooming and panning for navigating larger graphs.
-* **Algorithms Visualized:** Execute and visualize Dijkstra's Shortest Path and a custom Community Detection algorithm in real-time.
-* **Multithreaded UI:** Heavy algorithm calculations run on dedicated background threads. The application strictly uses `Platform.runLater` to ensure the JavaFX UI remains responsive and updates safely.
+* **Algorithms Visualized:** Execute and visualize Dijkstra's Shortest Path and the Label Propagation algorithm in real-time.
+* **Multithreaded UI:** Heavy algorithm calculations run on dedicated background threads. The application strictly uses `Platform.runLater`.
 * **Random Graph Generation:** Automatically generate and populate large test graphs with randomized node placements, edges, and connection weights.
-* **Data Persistence:** Save and load graph states locally. This is powered by a custom regex-based encoder/decoder to parse text files.
+* **Data Persistence:** Save and load graph states locally using a regex parser.
 * **Friend Suggestions:** Basic recommendation logic based on node adjacency mapping.
 
 ## Tech Stack
