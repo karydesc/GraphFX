@@ -1,3 +1,5 @@
+<img width="696" height="410" alt="image" src="https://github.com/user-attachments/assets/e7b6a80b-4dbd-4625-9557-a258733a743b" />
+
 # GraphFX: Interactive Graph Algorithm Visualizer
 
 A desktop application built with Java and JavaFX for creating, managing, and visualizing graph data structures and algorithms.
