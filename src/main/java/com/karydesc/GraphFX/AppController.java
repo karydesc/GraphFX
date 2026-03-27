@@ -9,30 +9,27 @@ import javafx.scene.input.MouseEvent;
 import javafx.scene.input.ScrollEvent;
 import javafx.scene.input.ZoomEvent;
 import javafx.scene.layout.AnchorPane;
-import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Line;
 import javafx.scene.transform.Scale;
 
-import java.util.function.Supplier;
 import java.util.random.RandomGenerator;
 import java.util.regex.*;
-import java.io.FileWriter;   // Import the FileWriter class
-import java.io.File;  // Import the File class
+
 
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class AppController {
-    private int userCount = 0;
-    private int edgeCount = 0;
+    static int userCount = 0;
+    int edgeCount = 0;
     Scanner scanner = new Scanner(System.in);
     protected Boolean addingNode = false;
     protected Boolean removingNode = false;
     Set<Edge> edges = new HashSet<>(); //keep track of edges in graph, used only when loading and saving from files to avoid iterating through adj nested hashmaps
-    EncoderDecoder encoderDecoder = new EncoderDecoder(); //used to encode and decode objects into and from files
+    EncoderDecoder encoderDecoder = new EncoderDecoder(this); //used to encode and decode objects into and from files
     Map<String, NodeFX> circles = new HashMap<>();  //to lookup nodeFX instances through their string name/id
     Map<NodeFX, Map<NodeFX, Edge>> adjList = new HashMap<>(); //nested hashmap adjacency list, ex. to get chris and joes edge object -> hashmap.get(chris).get(joe).getWeight. simple and straightforward
     @FXML
@@ -310,7 +307,7 @@ public class AppController {
         popup.setTitle("The Future is Euro");
         popup.showAndWait().ifPresent(file::set);//same process to get filename
         if (popup.getResult() == null || popup.getResult().isEmpty()) return;
-        encoderDecoder.saveToFile(file.get()); //calling saveToFile method
+        encoderDecoder.saveToFile(file.get(), circles, edges); //calling saveToFile method
     }
 
     @FXML
@@ -341,8 +338,8 @@ public class AppController {
     private void communityDetectionHandler() {
         AtomicReference<String> weight = new AtomicReference<>();
         TextInputDialog popup = new TextInputDialog();
-        popup.setHeaderText("Minimum connection weight");
-        popup.setContentText("Input float in range 0.01 - 1.0");
+        popup.setHeaderText("Community Detection - Label Propagation");
+        popup.setContentText("Maximum iterations");
         popup.setTitle("Input");
         popup.showAndWait().ifPresent(weight::set);
         for (String x : circles.keySet()) {
@@ -350,14 +347,14 @@ public class AppController {
             node.setFill(Paint.valueOf("black"));
         }
         if (Objects.equals(weight.get(), "")) {
-            weight.set("0.01");
+            weight.set("5");
         }
         try {
-            Thread task = new Thread(() -> runCommunityDetection(Float.parseFloat(weight.get())));
+            Thread task = new Thread(() -> Algorithms.runCommunityDetection(Integer.parseInt(weight.get()),circles,adjList));
             task.setDaemon(true);
             task.start();
         } catch (Exception e) {
-            System.err.println("Error parsing threshold input.");
+            System.err.println("Error parsing parameter input.");
         }
 
 
@@ -386,20 +383,20 @@ public class AppController {
             node.dstToSource.setLayoutY(circles.get(x).getCenterY() - 35);
             node.dstToSource.setTextFill(Paint.valueOf("gray"));
         }
-        Thread dijkstraThread = new Thread(() -> runDijkstra(source.get()));
+        Thread dijkstraThread = new Thread(() -> Algorithms.runDijkstra(source.get(),circles,adjList));
         dijkstraThread.setDaemon(true);
         dijkstraThread.start();
     }
 
     @FXML
     private void friendSuggestionHandler() {
-        Thread friendSuggestion = new Thread(this::friendSuggestion);
+        Thread friendSuggestion = new Thread(() -> Algorithms.friendSuggestion(circles,adjList));
         friendSuggestion.setDaemon(true);
         friendSuggestion.start();
     }
 
     //Graph operations
-    private void addEdge(NodeFX node1, NodeFX node2, float weight) { //
+    void addEdge(NodeFX node1, NodeFX node2, float weight) { //
         if (weight < 0.01 || weight > 1 || nodeDoesNotExist(node1) || nodeDoesNotExist(node2)) {
             System.out.println("\nInvalid input for edge creation");
             return;
@@ -437,7 +434,7 @@ public class AppController {
         userCount--;
     }
 
-    private void addNode(Integer x, Integer y, String name) {
+    public void addNode(Integer x, Integer y, String name) {
         if (!nodeExists(name)) { //if node doesn't already exist
             NodeFX temp = new NodeFX(x, y, 15, name);
             adjList.put(temp, new HashMap<>()); //new entry in adjlist
@@ -461,14 +458,14 @@ public class AppController {
         return !circles.containsValue(user);
     }
 
-    private class NodeFX extends Circle {
+    public class NodeFX extends Circle {
         protected String name;
 
         protected Label nodeLabel = new Label();
         protected ArrayList<NodeFX> adjacent = new ArrayList<>();
         protected Float minDistance = Float.MAX_VALUE;
         protected Label dstToSource = new Label();
-        private NodeFX previous = null;
+        NodeFX previous = null;
 
         public boolean equals(Object obj) {
             if (obj instanceof NodeFX u) {
@@ -588,7 +585,7 @@ public class AppController {
 
     }
 
-    private class Edge extends Line {
+    public class Edge extends Line {
 
         protected NodeFX source;
         protected NodeFX destination;
@@ -631,234 +628,10 @@ public class AppController {
 
     }
 
-    private class EncoderDecoder {
-
-        String encode(NodeFX node) {
-            return String.format("n[%s,%s,%s]\n", node.name, node.getCenterX(), node.getCenterY()); //example output n[A,100.0,150.0]
-        }
-
-        String encode(Edge edge) {
-            return String.format("e[%s,%s,%s]\n", edge.source.name, edge.destination.name, edge.getWeight()); //example output e[D,F,0.5]
-        }
-
-        void readFromFile(String filename) {
-            File myFile; //file object to represent the input file
-            Scanner myReader; //scanner to read the file line by line
-            try {
-                myFile = new File(filename); //initialize file object with the given filename
-                myReader = new Scanner(myFile); //initialize scanner to read the file
-            } catch (IOException e) {
-                System.out.println("An error occurred opening the file"); //error handling for file not found or reading issues
-                return; //exit the function on error
-            }
-            while (myReader.hasNext()) { //iterate through each line in the file
-                String line = myReader.nextLine(); //read the current line
-                String regex;
-                if (line.charAt(0) == 'n') { //check if the line starts with 'n' (node representation)
-                    regex = "n\\[(.*?),(.*?),(.*?)]"; //regex to match node format: n[name,value1,value2]
-                    Pattern pattern = Pattern.compile(regex); //compile the regex pattern
-                    Matcher matcher = pattern.matcher(line); //create a matcher for the current line
-                    if (matcher.matches()) { //check if the line matches the regex pattern
-                        // Parse the node details
-                        String name;
-                        int value1;
-                        int value2;
-                        try {
-                            name = matcher.group(1); //capture the name of the node
-                            value1 = (int) Float.parseFloat(matcher.group(2)); //convert first value to an integer
-                            value2 = (int) Float.parseFloat(matcher.group(3)); //convert second value to an integer
-                        } catch (Exception e) {
-                            System.out.println("Error when parsing the coordinates in line: " + line);
-                            continue;
-                        }
-                        addNode(value1, value2, name); //add the parsed node to the graph
-                        userCount++;
-                    }
-
-                } else if (line.charAt(0) == 'e') { //check if the line starts with 'e' (edge representation)
-                    regex = "e\\[(.*?),(.*?),(.*?)]"; //regex to match edge format: e[source,destination,weight]
-                    Pattern pattern = Pattern.compile(regex); //compile the regex pattern
-                    Matcher matcher = pattern.matcher(line); //create a matcher for the current line
-
-                    if (matcher.matches()) { //check if the line matches the regex pattern
-                        // Parse the edge details
-                        String source = matcher.group(1); //capture the source node name
-                        String destination = matcher.group(2);//capture the destination node name
-                        float weight;
-                        try {
-                            weight = Float.parseFloat(matcher.group(3));
-                        } catch (Exception e) {
-                            System.out.println("Error converting from float on line: " + line);
-                            continue;
-                        } //convert weight to a float
-                        addEdge(circles.get(source), circles.get(destination), weight); //add the edge to the graph
-                        edgeCount++;
-                    }
-                }
-
-            }
-        }
-
-        void saveToFile(String filename) throws IOException {
-            FileWriter myFile; //file writer object to write to the file
-            try {
-                myFile = new FileWriter(filename); //initialize the file writer with the given filename
-            } catch (IOException e) {
-                System.out.println("An error occurred."); //error handling for issues creating the file
-                return; //exit the function on error
-            }
-            for (NodeFX node : circles.values()) { //iterate through all nodes in the graph
-                myFile.write(encode(node)); //write the encoded node representation to the file
-            }
-            for (Edge edge : edges) { //iterate through all edges in the graph
-                myFile.write(encode(edge)); //write the encoded edge representation to the file
-            }
-            myFile.close(); //close the file writer to save changes
-        }
-
-    }
-
-    //Algorithms
-    private void runDijkstra(NodeFX source) {
-        for (String x : circles.keySet()) { //set initial values on all nodes
-            NodeFX node = circles.get(x);
-            node.minDistance = Float.MAX_VALUE;
-            node.previous = null;
-            Platform.runLater(node::reset);
-        }
-        Platform.runLater(() -> source.setMinDistance(0F));
-        source.minDistance = 0F;
-
-        //priority queue with custom comparator
-        PriorityQueue<NodeFX> priorityQueue = new PriorityQueue<>(10, Comparator.comparing(node -> node.minDistance));
-        priorityQueue.add(source);
-
-
-        while (!priorityQueue.isEmpty()) { //dijkstra implementation
-            NodeFX current = priorityQueue.poll(); //get current node
-            Platform.runLater(current::setActive); //set it as active
-
-            for (NodeFX node : current.getAdjacent()) { //iterate through its neighbors
-                Float newDistance = current.minDistance + adjList.get(current).get(node).getWeight(); //current distance to source
-                if (newDistance < node.minDistance) {//if the new distance is better than the old
-                    priorityQueue.remove(node); //remove the node from priority list
-                    node.minDistance = newDistance; //adjust distance property
-                    node.previous = current; //set pointer to previous node
-                    Platform.runLater(() -> node.setMinDistance(newDistance)); //on main thread, change its label to the new distance
-                    priorityQueue.add(node); //read the node with updated values
-                }
-            }
-            try {
-                Thread.sleep(250); //sleep for once second for visualization purposes
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-
-            Platform.runLater(current::setVisited); //set node as visited
-
-
-        }
-        for (NodeFX user : circles.values()) { //this part is where we retrace our steps to the source for every node (for loop iterates through every node)
-            if (user.equals(source)) continue; //we don't need the source
-
-            System.out.print("\nShortest path from source to " + user.getName() + ": ");
-
-            if (user.minDistance == Float.MAX_VALUE) { //if the minDistance value has not been touched at all, it means that the node has no available path to the source
-                System.out.println("No path found.");
-                continue;
-            }
-
-            // Use a stack to reconstruct the path
-            Stack<String> pathStack = new Stack<>();
-            NodeFX currIter = user;
-
-            while (currIter != null) {//currIter being null means we reached the source, before we reach it we iterate through the pointers and push the names to the stack
-                pathStack.push(currIter.getName());
-                currIter = currIter.previous;
-            }
-
-            // Print the path in the correct order
-            while (!pathStack.isEmpty()) {
-                System.out.print(pathStack.pop());
-                if (!pathStack.isEmpty()) {
-                    System.out.print(" -> ");
-                }
-            }
-        }
-
-
-    }
-
-    private void runCommunityDetection(float threshold) {
-        Supplier<Color> supplier = () -> Color.color(Math.random(), Math.random(), Math.random());
-        Set<Set<NodeFX>> communities = new HashSet<>();
-        Set<NodeFX> visited = new HashSet<>();
-
-        for (String user : circles.keySet()) {
-            NodeFX node = circles.get(user);
-            Color currentColor = supplier.get();
-            if (!visited.contains(node)) {
-                Queue<NodeFX> fxQueue = new LinkedList<>();
-                Set<NodeFX> community = new HashSet<>();
-                fxQueue.add(node);
-
-                while (!fxQueue.isEmpty()) {
-                    NodeFX current = fxQueue.poll();
-                    community.add(current);
-                    visited.add(current);
-                    for (NodeFX x : current.getAdjacent()) {
-                        if (adjList.get(current).get(x).getWeight() >= threshold && !visited.contains(x)) {
-                            community.add(x);
-                            Platform.runLater(() -> x.setFill(currentColor));
-                            fxQueue.add(x);
-                        }
-                    }
-                }
-                // Normalize the community by converting to a sorted list, then back to a set
-                if (community.size() > 1) {
-                    communities.add(community);
-                    Platform.runLater(() -> {
-                        for (NodeFX x : community){
-                            x.setFill(currentColor);
-                        }
-                    });
-
-                }
-            }
-        }
-        for (Set<NodeFX> x : communities) {
-            System.out.println("\n\nSeparator: ");
-            for (NodeFX c : x) {
-                System.out.print("  " + c.name + "  ");
-            }
-        }
-    }
-
-
-    private void friendSuggestion() {
-        Map<NodeFX, Set<NodeFX>> friendSuggestions = new HashMap<>(); //keep track of friend suggestions
-        for (String x : circles.keySet()) {
-            NodeFX current = circles.get(x);
-            friendSuggestions.put(current, new HashSet<>());
-            for (NodeFX adjNode1 : current.getAdjacent()) {
-                for (NodeFX adjNode2 : adjNode1.getAdjacent()) {
-                    if (!current.getAdjacent().contains(adjNode2) && !current.equals(adjNode2)) {
-                        friendSuggestions.get(current).add(adjNode2);
-                    }
-                }
-            }
-        }
-
-        for (Map.Entry<NodeFX, Set<NodeFX>> entry : friendSuggestions.entrySet()) {
-            NodeFX user = entry.getKey();
-            Set<NodeFX> suggestions = entry.getValue();
-            System.out.println("\nUser: " + user.getName());
-            System.out.println("Suggested Friends: ");
-            for (NodeFX suggestedFriend : suggestions) {
-                System.out.println(suggestedFriend.getName());
-            }
-        }
-    }
 }
+
+
+
+
 
 
