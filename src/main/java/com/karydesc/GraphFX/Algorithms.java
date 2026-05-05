@@ -94,7 +94,7 @@ public class Algorithms {
             iteration++;
 
             List<AppController.NodeFX> nodes = new ArrayList<>(circles.values());
-            Collections.shuffle(nodes); // important!
+            Collections.shuffle(nodes);
 
             for (AppController.NodeFX node : nodes) {
 
