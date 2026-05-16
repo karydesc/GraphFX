@@ -7,7 +7,7 @@ A desktop application built with Java and JavaFX for creating, managing, and vis
 ## Features
 * **Interactive Canvas:** Dynamically add, remove, drag, and connect nodes on the canvas. Supports zooming and panning for navigating larger graphs.
 * **Algorithms Visualized:** Execute and visualize Dijkstra's Shortest Path and the Label Propagation algorithm in real-time.
-* **Multithreaded UI:** Heavy algorithm calculations run on dedicated background threads. The application strictly uses `Platform.runLater`.
+* **Multithreaded UI:** Algorithm calculations run on dedicated background threads. The application strictly uses `Platform.runLater`.
 * **Random Graph Generation:** Automatically generate and populate large test graphs with randomized node placements, edges, and connection weights.
 * **Data Persistence:** Save and load graph states locally using a regex parser.
 * **Friend Suggestions:** Basic recommendation logic based on node adjacency mapping.
@@ -22,19 +22,19 @@ A desktop application built with Java and JavaFX for creating, managing, and vis
 ## Prerequisites
 To build and run this project, you will need:
 * Java Development Kit (JDK) 17 or higher.
-* (Optional) Maven installed on your system. *Note: The project includes a Maven Wrapper (`mvnw`), so installing Maven locally is not strictly required.*
+* (Optional) Maven installed on your system
 
 ## How to Run
 Because this project utilizes the Maven Wrapper, you can easily compile and run it directly from your terminal without manually configuring JavaFX modules.
 
 **On macOS / Linux:**
-` ` `bash
-./mvnw clean javafx:run
+` ` `
+[ROOT]/mvnw clean javafx:run
 ` ` `
 
 **On Windows:**
-` ` `cmd
+` ` `
 mvnw.cmd clean javafx:run
 ` ` `
 
-*(Note: Ensure your terminal is in the root directory containing the `pom.xml` file before executing the commands).*
+*(Note: Ensure terminal is in the root directory containing the `pom.xml` file before executing the commands).*
